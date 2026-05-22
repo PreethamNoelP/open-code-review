@@ -54,11 +54,17 @@ func ResolveLineNumbers(comments []model.LlmComment, diffs []model.Diff) []model
 	return result
 }
 
-// resolveFromHunk tries to find the startLine/endLine by matching ExistingCode
-// against "from" side lines (context + deleted) in the diff hunks.
-// Returns true on success (comments fields are mutated in place).
+// indexedLine pairs a normalized line with its absolute file line number.
+type indexedLine struct {
+	lineNum int
+	content string
+}
+
+// resolveFromHunk tries to find startLine/endLine by matching ExistingCode
+// against hunk lines. It tries the new-side first (context + added lines →
+// new-file line numbers), then falls back to old-side (context + deleted →
+// old-file line numbers).
 func resolveFromHunk(d *model.Diff, cm *model.LlmComment) bool {
-	// TODO: re-track with llm
 	hunks := ParseHunks(d.Diff)
 	if len(hunks) == 0 {
 		return false
@@ -70,53 +76,77 @@ func resolveFromHunk(d *model.Diff, cm *model.LlmComment) bool {
 	}
 
 	for i := range hunks {
-		hunk := &hunks[i]
-		offset := 0 // tracks position within old-file range
+		newSide := extractSideLines(&hunks[i], true)
+		if start, end, ok := matchConsecutive(newSide, targetLines); ok {
+			cm.StartLine = start
+			cm.EndLine = end
+			return true
+		}
+	}
 
-		lines := hunk.Lines
-		for j := 0; j < len(lines); j++ {
-			line := lines[j]
-
-			switch line.Type {
-			case HunkAdded:
-				// Added lines are TO-side only; don't affect old-file offset
-				continue
-			case HunkContext, HunkDeleted:
-				// Both are FROM-side candidates
-				if matchAt(lines, j, targetLines) {
-					startLine := hunk.OldStart + offset
-					endLine := startLine + len(targetLines) - 1
-					cm.StartLine = startLine
-					cm.EndLine = endLine
-					return true
-				}
-				offset++
-			}
+	for i := range hunks {
+		oldSide := extractSideLines(&hunks[i], false)
+		if start, end, ok := matchConsecutive(oldSide, targetLines); ok {
+			cm.StartLine = start
+			cm.EndLine = end
+			return true
 		}
 	}
 
 	return false
 }
 
-// matchAt checks whether targetLines[i] matches the normalized content of
-// lines[startIndex+i] for all i, where each matched line must be a "from" side
-// line (context or deleted).
-func matchAt(lines []HunkLine, startIndex int, targetLines []string) bool {
-	for i, target := range targetLines {
-		idx := startIndex + i
-		if idx >= len(lines) {
-			return false
-		}
-		l := lines[idx]
-		// Must be a "from" side line
-		if l.Type != HunkContext && l.Type != HunkDeleted {
-			return false
-		}
-		if normalizeLine(l.Content) != target {
-			return false
+// extractSideLines extracts one side of the diff from a hunk.
+// When newSide is true, returns context+added lines with new-file line numbers.
+// When newSide is false, returns context+deleted lines with old-file line numbers.
+func extractSideLines(hunk *Hunk, newSide bool) []indexedLine {
+	var result []indexedLine
+	oldLine := hunk.OldStart
+	newLine := hunk.NewStart
+
+	for _, l := range hunk.Lines {
+		switch l.Type {
+		case HunkContext:
+			if newSide {
+				result = append(result, indexedLine{newLine, normalizeLine(l.Content)})
+			} else {
+				result = append(result, indexedLine{oldLine, normalizeLine(l.Content)})
+			}
+			oldLine++
+			newLine++
+		case HunkAdded:
+			if newSide {
+				result = append(result, indexedLine{newLine, normalizeLine(l.Content)})
+			}
+			newLine++
+		case HunkDeleted:
+			if !newSide {
+				result = append(result, indexedLine{oldLine, normalizeLine(l.Content)})
+			}
+			oldLine++
 		}
 	}
-	return true
+	return result
+}
+
+// matchConsecutive scans sideLines for a consecutive run matching all targetLines.
+func matchConsecutive(sideLines []indexedLine, targetLines []string) (startLine, endLine int, found bool) {
+	if len(targetLines) == 0 || len(sideLines) < len(targetLines) {
+		return 0, 0, false
+	}
+	for i := 0; i <= len(sideLines)-len(targetLines); i++ {
+		matched := true
+		for j, target := range targetLines {
+			if sideLines[i+j].content != target {
+				matched = false
+				break
+			}
+		}
+		if matched {
+			return sideLines[i].lineNum, sideLines[i+len(targetLines)-1].lineNum, true
+		}
+	}
+	return 0, 0, false
 }
 
 // resolveFromFileContent scans the new file content line-by-line for consecutive
