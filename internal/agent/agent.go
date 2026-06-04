@@ -740,6 +740,8 @@ func formatToolDefs(toolDefs []llm.ToolDef) string {
 // and collects review comments until task_done is called or limits are reached.
 func (a *Agent) performLlmCodeReview(ctx context.Context, messages []llm.Message, newPath string) error {
 	toolReqCount := a.args.Template.MaxToolRequestTimes
+	const maxConsecutiveEmptyRounds = 3
+	consecutiveEmptyRounds := 0
 
 	for toolReqCount > 0 {
 		select {
@@ -823,8 +825,14 @@ func (a *Agent) performLlmCodeReview(ctx context.Context, messages []llm.Message
 			break
 		}
 		if !hasValidResult {
-			fmt.Fprintf(stdout.Writer(), "[ocr] No valid tool results for %s, stopping.\n", newPath)
-			break
+			consecutiveEmptyRounds++
+			if consecutiveEmptyRounds >= maxConsecutiveEmptyRounds {
+				fmt.Fprintf(stdout.Writer(), "[ocr] Too many empty retries for %s, stopping.\n", newPath)
+				break
+			}
+			fmt.Fprintf(stdout.Writer(), "[ocr] No valid tool results for %s, retrying...\n", newPath)
+		} else {
+			consecutiveEmptyRounds = 0
 		}
 
 		succeed := a.addNextMessage(content, calls, results, &messages, newPath)

@@ -86,6 +86,14 @@ func (p *CodeSearchProvider) gitGrep(searchText string, caseSensitive bool, useP
 	var fileOrder []string
 	seen := make(map[string]bool)
 
+	hasRef := p.FileReader.Ref != ""
+	splitN := 3
+	offset := 0
+	if hasRef {
+		splitN = 4
+		offset = 1
+	}
+
 	var sb strings.Builder
 	if truncated {
 		sb.WriteString(fmt.Sprintf("Note: The results have been truncated. Only showing first %d results.\n", gitGrepMaxCount))
@@ -95,18 +103,18 @@ func (p *CodeSearchProvider) gitGrep(searchText string, caseSensitive bool, useP
 		if line == "" {
 			continue
 		}
-		parts := strings.SplitN(line, ":", 3)
-		if len(parts) < 3 {
+		parts := strings.SplitN(line, ":", splitN)
+		if len(parts) < splitN {
 			continue
 		}
-		fname := parts[0]
+		fname := parts[offset]
 		m := match{}
-		ln, parseErr := strconv.Atoi(parts[1])
+		ln, parseErr := strconv.Atoi(parts[offset+1])
 		if parseErr != nil {
 			continue
 		}
 		m.lineNum = ln
-		m.content = parts[2]
+		m.content = parts[offset+2]
 		if !seen[fname] {
 			seen[fname] = true
 			fileOrder = append(fileOrder, fname)
