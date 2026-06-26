@@ -72,6 +72,12 @@ func TestDiscoverRepos_FindsRepos(t *testing.T) {
 	writeJSONL(t, filepath.Join(repoB, "session3.jsonl"),
 		`{"type":"session_start","timestamp":"2025-01-03T10:00:00Z"}`)
 
+	// Ensure repo-b's file has a strictly later mtime so sort-by-ModTime is deterministic.
+	future := time.Now().Add(time.Hour)
+	if err := os.Chtimes(filepath.Join(repoB, "session3.jsonl"), future, future); err != nil {
+		t.Fatal(err)
+	}
+
 	repos, err := DiscoverRepos(root)
 	if err != nil {
 		t.Fatal(err)
