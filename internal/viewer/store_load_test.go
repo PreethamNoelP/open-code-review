@@ -392,6 +392,9 @@ func TestLoadSession_ToolCallWithoutRequest(t *testing.T) {
 }
 
 func TestDiscoverRepos_SkipsUnreadableSubdir(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("permission checks are bypassed for root")
+	}
 	root := t.TempDir()
 	badRepo := filepath.Join(root, "unreadable-repo")
 	if err := os.MkdirAll(badRepo, 0755); err != nil {
@@ -415,6 +418,9 @@ func TestDiscoverRepos_SkipsUnreadableSubdir(t *testing.T) {
 }
 
 func TestListSessions_SkipsUnreadableFiles(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("permission checks are bypassed for root")
+	}
 	root := t.TempDir()
 	repoDir := filepath.Join(root, "repo")
 	if err := os.MkdirAll(repoDir, 0755); err != nil {

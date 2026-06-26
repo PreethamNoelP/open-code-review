@@ -67,6 +67,9 @@ func TestHandleRepos_UnreadableRoot(t *testing.T) {
 }
 
 func TestHandleRepos_PermissionDenied(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("permission checks are bypassed for root")
+	}
 	root := t.TempDir()
 	// Create a directory that exists but cannot be read
 	badDir := filepath.Join(root, "unreadable")
