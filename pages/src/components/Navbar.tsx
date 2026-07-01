@@ -18,6 +18,7 @@ const navTabs = [
   { path: '/benchmark', labelKey: 'navbar.benchmark' },
   { path: '/quickstart', labelKey: 'navbar.quickstart' },
   { path: '/docs', labelKey: 'navbar.docs' },
+  { path: '/scan', labelKey: 'navbar.scan' },
 ];
 
 const Navbar: React.FC = () => {

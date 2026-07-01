@@ -5,6 +5,7 @@ import FeaturesPage from './pages/FeaturesPage';
 import BenchmarkPage from './pages/BenchmarkPage';
 import QuickStartPage from './pages/QuickStartPage';
 import DocsPage from './pages/DocsPage';
+import ScanPage from './pages/ScanPage';
 
 const ScrollToTop: React.FC = () => {
   const { pathname } = useLocation();
@@ -23,6 +24,7 @@ const App: React.FC = () => {
         <Route path="/benchmark" element={<LandingPage><BenchmarkPage /></LandingPage>} />
         <Route path="/quickstart" element={<LandingPage><QuickStartPage /></LandingPage>} />
         <Route path="/docs" element={<LandingPage><DocsPage /></LandingPage>} />
+        <Route path="/scan" element={<LandingPage><ScanPage /></LandingPage>} />
       </Routes>
     </>
   );
